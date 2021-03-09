@@ -166,7 +166,7 @@ func (srv *server) publishOrder(ctx context.Context, userID uint64, market *mode
 	if err != nil {
 		return nil, err
 	}
-	err = service.dm.Publish("orders", map[string]string{"market": market.ID}, kafkaGo.Message{Value: bytes})
+	err = server.publishers[market.ID].WriteMessages(ctx, kafkaGo.Message{Value: bytes})
 	return order, err
 }
 
@@ -192,5 +192,5 @@ func (srv *server) publishCancelOrder(market *model.Market, order *data.Order) e
 	if err != nil {
 		return err
 	}
-	return service.dm.Publish("orders", map[string]string{"market": market.ID}, kafkaGo.Message{Value: bytes})
+	return server.publishers[market.ID].WriteMessages(ctx, kafkaGo.Message{Value: bytes})
 }

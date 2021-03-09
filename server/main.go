@@ -32,6 +32,7 @@ import (
 	"time"
 
 	"around25.com/exchange/demo_api/config"
+	"around25.com/exchange/demo_api/lib/kafka"
 	"github.com/rs/zerolog/log"
 )
 
@@ -41,19 +42,25 @@ type Server interface {
 }
 
 type server struct {
-	HTTP   *http.Server
-	Config config.Config
-	ctx    context.Context
-	close  context.CancelFunc
+	HTTP       *http.Server
+	Config     config.Config
+	ctx        context.Context
+	close      context.CancelFunc
+	publishers map[string]*kafka.KafkaProducer
 }
 
 // NewServer godoc
 func NewServer(cfg config.Config) Server {
 	ctx, close := context.WithCancel(context.Background())
+	publishers := map[string]*kafka.KafkaProducer{}
+	for _, market := range cfg.Markets {
+		publishers[market.ID] = kafka.NewKafkaProducer(cfg.Kafka.Brokers, cfg.Kafka.UseTLS, "engine.orders."+market.ID)
+	}
 	return &server{
-		Config: cfg,
-		ctx:    ctx,
-		close:  close,
+		Config:     cfg,
+		ctx:        ctx,
+		close:      close,
+		publishers: publishers,
 	}
 }
 
