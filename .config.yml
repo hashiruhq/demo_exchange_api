@@ -11,7 +11,7 @@ server:
 
 kafka:
   brokers: 
-    - kafka:9092
+    - 161.35.212.60:9092
 
 markets:
   - id: btcusdt
