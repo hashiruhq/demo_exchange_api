@@ -1,0 +1,44 @@
+stages:
+   - build
+  # - test
+
+build:
+  tags:
+    - docker
+    - around25
+  stage: build
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_DRIVER: overlay2
+    IMAGE_TAG: $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG-$CI_PIPELINE_IID
+    APP_VERSION: $CI_COMMIT_REF_NAME-$CI_PIPELINE_IID
+    GIT_COMMIT: $CI_COMMIT_SHORT_SHA
+  services:
+    - docker:18.09.7-dind
+  script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
+    - docker build --build-arg GIT_COMMIT=$GIT_COMMIT --build-arg APP_VERSION=$APP_VERSION -t $IMAGE_TAG .
+    - docker push $IMAGE_TAG
+  only:
+    - develop
+    - master
+
+release:
+  tags:
+    - docker
+    - around25
+  stage: build
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_DRIVER: overlay2
+    IMAGE_TAG: $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG
+    APP_VERSION: $CI_COMMIT_REF_NAME-$CI_PIPELINE_IID
+    GIT_COMMIT: $CI_COMMIT_SHORT_SHA
+  services:
+    - docker:18.09.7-dind
+  script:
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
+    - docker build --build-arg GIT_COMMIT=$GIT_COMMIT --build-arg APP_VERSION=$APP_VERSION -t $IMAGE_TAG .
+    - docker push $IMAGE_TAG
+  only:
+    - tags

@@ -1,0 +1,70 @@
+syntax = "proto3";
+package data;
+
+import "order.proto";
+import "trade.proto";
+
+enum EventType {
+  // Invalid status for any non set field
+  Unspecified = 0;
+  // An order has changed status, either by being acknowledged by the engine on creation,
+  // being cancelled by a command or by matching with another order.
+  OrderStatusChange = 1;
+  // A new trade was generated beetween two orders
+  NewTrade = 2;
+  // A stop loss order was activated by the engine due to market change
+  OrderActivated = 3;
+  // Error in processing
+  Error = 4;
+}
+
+message OrderStatusMsg {
+  uint64 ID = 1;
+  // The type of the order: 0=limit 1=market
+  OrderType Type = 2;
+	// The side of the market: 0=buy 1=sell
+  MarketSide Side = 3;
+  uint64 Price = 4;
+  uint64 Amount = 5;
+  uint64 Funds = 6;
+	// The unique identifier the account that added the order
+	uint64 OwnerID = 7;
+  OrderStatus Status = 8;
+}
+
+enum ErrorCode {
+	Undefined = 0;
+	InvalidOrder = 1;
+  CancelFailed = 2;
+}
+
+message ErrorMsg {
+  ErrorCode Code = 1;
+  // The type of the order: 0=limit 1=market
+  OrderType Type = 2;
+	// The side of the market: 0=buy 1=sell
+  MarketSide Side = 3;
+	uint64 OrderID = 4;
+  uint64 Price = 5;
+  uint64 Amount = 6;
+  uint64 Funds = 7;
+  // The unique identifier the account that added the order
+	uint64 OwnerID = 8;
+}
+
+message Event {
+  EventType Type = 1;
+  string Market = 2;
+  int64 CreatedAt = 3;
+  oneof Payload {
+    OrderStatusMsg OrderStatus = 4;
+    Trade Trade = 5;
+    OrderStatusMsg OrderActivation = 6;
+    ErrorMsg Error = 8;
+  }
+  uint64 SeqID = 7;
+}
+
+message Events {
+  repeated Event Events = 1;
+}

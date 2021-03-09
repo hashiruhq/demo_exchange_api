@@ -1,0 +1,15 @@
+syntax = "proto3";
+package data;
+
+import "order.proto";
+
+message Trade {
+  uint64 Price = 1;
+  uint64 Amount = 2;
+  uint64 AskID = 3;
+  uint64 AskOwnerID = 4;
+  uint64 BidID = 5;
+  uint64 BidOwnerID = 6;
+  MarketSide TakerSide = 7;
+  uint64 SeqID = 8;
+}

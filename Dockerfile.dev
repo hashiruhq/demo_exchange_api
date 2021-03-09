@@ -1,0 +1,32 @@
+FROM golang:1.13 as build
+
+RUN mkdir -p /build/demo_api
+WORKDIR /build/demo_api/
+
+# Force the go compiler to use modules
+ENV GO111MODULE=on
+ENV LOG_LEVEL="debug"
+ENV LOG_FORMAT="pretty"
+ 
+# We want to populate the module cache based on the go.{mod,sum} files.
+COPY go.mod .
+
+# This is the ‘magic’ step that will download all the dependencies that are specified in 
+# the go.mod and go.sum file.
+# Because of how the layer caching system works in Docker, the  go mod download 
+# command will _ only_ be re-run when the go.mod or go.sum file change 
+# (or when we add another docker instruction below this line)
+RUN go mod download
+
+# Add code refresh package
+RUN go get github.com/cespare/reflex
+RUN echo "--shutdown-timeout=1000ms -r '(\.go$|go\.mod)' -s -- sh -c 'go run -race . start'" >> /reflex.conf
+ENTRYPOINT ["reflex", "--decoration=none", "-c", "/reflex.conf"]
+ 
+COPY . .
+
+# RUN CGO_ENABLED=0 go build -a -installsuffix cgo --ldflags "-s -w" -o /usr/bin/demo_api
+
+EXPOSE 6060
+EXPOSE 80
+ENV PORT 80

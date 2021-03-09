@@ -1,0 +1,31 @@
+server: 
+  monitoring: 
+    enabled: true
+    host: 0.0.0.0
+    port: 6060
+    health: true
+    cors: true
+  api:
+    port: 80
+  exchange: demo
+
+kafka:
+  brokers: 
+    - kafka:9092
+
+markets:
+  - id: btcusdt
+    market_precision: 8
+    quote_precision: 5
+    market_coin_symbol: btc
+    quote_coin_symbol: usdt
+  - id: ethusdt
+    market_precision: 6
+    quote_precision: 5
+    market_coin_symbol: eth
+    quote_coin_symbol: usdt
+  - id: ethbtc
+    market_precision: 6
+    quote_precision: 8
+    market_coin_symbol: eth
+    quote_coin_symbol: btc

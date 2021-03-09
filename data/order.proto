@@ -1,0 +1,171 @@
+syntax = "proto3";
+package data;
+
+/**
+Order
+=====
+
+The order is the central message type used in receving trading requests from an outside system.
+This file defines the basic data structure and constants for each significant field.
+*/
+
+enum MarketSide {
+  // BUY value means the user wants to buy from the market
+  Buy = 0;
+  // SELL value means the user wants to sell to the market
+  Sell = 1;
+}
+
+enum OrderType {
+  // LimitOrder allows the trader to start an order where the transaction will be completed
+	// if the market price is at or better than the set price
+  Limit = 0;
+  // MarketOrder completes the trade at the current market price
+  Market = 1;
+}
+
+enum OrderStatus {
+  // StatusPending is used when the order has not yet been processed by the matching engine
+	Pending = 0;
+	// StatusUntouched means that the order was processed by the engine but it did not yet match with any order
+	Untouched = 1;
+	// StatusPartiallyFilled is used when the order was not completely filled
+	PartiallyFilled = 2;
+	// StatusCancelled is used when the order has been cancelled
+	Cancelled = 3;
+	// StatusFilled is used when the order was filled and th
+	Filled = 4;
+}
+
+enum StopLoss {
+  // By default an order has its stop loss flag set to disabled
+  None = 0;
+  // Stop loss triggers when the last trade price changes to a value at or below the `StopPrice`
+  Loss = 1;
+  // Stop entry triggers when the last trade price changes to a value at or above the `StopPrice`
+  Entry = 2;
+}
+
+enum CommandType {
+  // A new order should be added in the order book
+  NewOrder = 0;
+  // An existing order should be cancelled if it's not already filled
+  CancelOrder = 1;
+  // The whole market should be archived and stored in a safe location
+  // This command may not be needed since the engine should already create regular backups of the current orderbook
+  BackupMarket = 2;
+}
+
+// Order allows the trader to start an order where the transaction will be completed
+// if the market price is at or better than the set price
+message Order {
+  // The event type signals what operation can be executed on the market engine
+	// 0 = New Order
+	// 1 = Cancel Order
+	// 2 = Backup Market
+  CommandType EventType = 1;
+  // The type of the order: 0=limit 1=market
+  OrderType Type = 2;
+  // Category int8 // deprecated by the Type field
+	// The side of the market: 0=buy 1=sell
+  MarketSide Side = 3;
+  // Optional:
+	// Amount of coins to buy/sell with the order
+	// - The amount must be greater than the base_min_amount for the product and no larger than the base_max_amount.
+  uint64 Amount = 4;
+  // Optional:
+	// The price to pay for one unit in the market
+	// - The price must be specified in quote_increment product units.
+	// - The quote increment is the smallest unit of price. For the BTC-USD product,
+	//   the quote increment is 0.01 or 1 penny. Prices less than 1 penny will not be accepted,
+	//   and no fractional penny prices will be accepted. Not required for market orders.
+  uint64 Price = 5;
+  // Stop flag. Requires `StopPrice`` to be defined.
+	// Stop orders become active and wait to trigger based on the movement of the last trade price.
+	// There are 2 types of stop orders: 0=none 1=loss 2=entry
+	// - Stop loss triggers when the last trade price changes to a value at or below the `StopPrice`.
+	// - Stop entry triggers when the last trade price changes to a value at or above the `StopPrice`.
+	// - Note that when triggered, stop orders execute as either market or limit orders, depending on the type.
+  StopLoss Stop = 6;
+  // Sets trigger price for stop order. Only if stop is defined.
+  uint64 StopPrice = 7;
+  //*****************************************
+	// Market Order Fields
+	// - Requires the Amount field from above
+	// - At lease one of Amount or Funds fields should be set
+	// - Funds limit how much your quote currency account balance is used and
+	//   Amount limits the amount of coins that will be transacted
+	// - Market orders are always considered takers and should always fill immediately
+	//*****************************************
+
+	// Maximum total funds to use for the order
+	// - The funds field is optionally used for market orders. When specified it indicates how much of the product
+	//   quote currency to buy or sell. For example, a market buy for BTC-USD with funds specified as 150.00 will
+	//   spend 150 USD to buy BTC (including any fees). If the funds field is not specified for a market buy order,
+	//   size must be specified and the enting will use available funds in your account to buy bitcoin.
+	// - A market sell order can also specify the funds. If funds is specified, it will limit the sell to the amount
+	//   of funds specified. You can use funds with sell orders to limit the amount of quote currency funds received.
+  uint64 Funds = 8;
+  //******************************************
+	// Common fields
+	//******************************************
+	// The id of the order
+	uint64 ID = 9;
+  // The market for which this order is for. Ex: eth-btc
+  string Market = 10;
+  // The status is dictated by the stage in the execution of the order by the matching engine
+	// 0 = Pending
+	// 1 = Untouched
+	// 2 = Partially Filled
+	// 3 = Cancelled
+	// 4 = Filled
+	OrderStatus Status = 11;
+
+	// The unique identifier the account that added the order
+	uint64 OwnerID = 12;
+
+  // User Order ID: An id defined by the user to identity the order
+  // UserOrderId string
+
+  // FUTURE PROPERTY
+	//
+	// TimeInForce string // time in force. GTC, GTT, IOC, or FOK (default is GTC)
+
+	// FUTURE PROPERTY
+	//
+	// CancelAfter uint   // cancel after min, hour, day. Requires time_in_force to be GTT
+
+	// FUTURE PROPERTY
+	// The post-only flag indicates that the order should only make liquidity. If any part of the
+	// order results in taking liquidity, the order will be rejected and no part of it will execute.
+	//
+	// PostOnly    string // post only. Invalid when time_in_force is IOC or FOK
+
+	// FUTURE FIELD
+	// Prevent self trade
+	//
+	// Self-trading is not allowed on the trading engine. Two orders from the same user will not fill one another.
+	// When placing an order, you can specify the self-trade prevention behavior.
+	//
+	// DECREMENT AND CANCEL
+	// The default behavior is decrement and cancel. When two orders from the same user cross, the smaller order
+	// will be canceled and the larger order size will be decremented by the smaller order size. If the two orders
+	// are the same size, both will be canceled.
+	//
+	// CANCEL OLDEST
+	// Cancel the older (resting) order in full. The new order continues to execute.
+	// CANCEL NEWEST
+	// Cancel the newer (taking) order in full. The old resting order remains on the order book.
+
+	// CANCEL BOTH
+	// Immediately cancel both orders.
+
+	// NOTES FOR MARKET ORDERS
+	// When a market order using dc self-trade prevention encounters an open limit order, the behavior depends on
+	// which fields for the market order message were specified. If funds and size are specified for a buy order,
+	// then size for the market order will be decremented internally within the matching engine and funds will
+	// remain unchanged. The intent is to offset your target size without limiting your buying power. If size is
+	// not specified, then funds will be decremented. For a market sell, the size will be decremented when
+	// encountering existing limit orders.
+	// PreventSelfTrade string
+}
