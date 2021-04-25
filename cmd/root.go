@@ -32,7 +32,7 @@ import (
 
 // LogLevel Flag
 var LogLevel = "info"
-var LogFormat = "json"
+var LogFormat = "pretty"
 var cfgFile string
 var rootCmd = &cobra.Command{
 	Use:   "demo_api",
@@ -48,7 +48,7 @@ func init() {
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./.config.yaml)")
 	rootCmd.PersistentFlags().StringVarP(&LogLevel, "log-level", "", "info", "logging level to show (options: debug|info|warn|error|fatal|panic, default: info)")
-	rootCmd.PersistentFlags().StringVarP(&LogFormat, "log-format", "", "info", "log format to generate (Options: json|pretty, default: json)")
+	rootCmd.PersistentFlags().StringVarP(&LogFormat, "log-format", "", "pretty", "log format to generate (Options: json|pretty, default: json)")
 	viper.SetConfigName(".config")
 	viper.AddConfigPath(".")              // First try to load the config from the current directory
 	viper.AddConfigPath("$HOME")          // Then try to load it from the HOME directory

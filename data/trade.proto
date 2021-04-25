@@ -1,6 +1,8 @@
 syntax = "proto3";
 package data;
 
+option go_package = "around25.com/exchange/demo_api/data";
+
 import "order.proto";
 
 message Trade {

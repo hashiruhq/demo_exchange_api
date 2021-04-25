@@ -1,6 +1,6 @@
 module around25.com/exchange/demo_api
 
-go 1.13
+go 1.16
 exclude github.com/ugorji/go v1.1.4
 
 require (

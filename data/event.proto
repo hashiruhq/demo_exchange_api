@@ -1,6 +1,8 @@
 syntax = "proto3";
 package data;
 
+option go_package = "around25.com/exchange/demo_api/data";
+
 import "order.proto";
 import "trade.proto";
 
@@ -30,6 +32,8 @@ message OrderStatusMsg {
 	// The unique identifier the account that added the order
 	uint64 OwnerID = 7;
   OrderStatus Status = 8;
+  uint64 FilledAmount = 9;
+  uint64 UsedFunds = 10;
 }
 
 enum ErrorCode {

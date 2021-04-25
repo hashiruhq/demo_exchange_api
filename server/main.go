@@ -46,13 +46,13 @@ type server struct {
 	Config     config.Config
 	ctx        context.Context
 	close      context.CancelFunc
-	publishers map[string]*kafka.KafkaProducer
+	publishers map[string]kafka.Producer
 }
 
 // NewServer godoc
 func NewServer(cfg config.Config) Server {
 	ctx, close := context.WithCancel(context.Background())
-	publishers := map[string]*kafka.KafkaProducer{}
+	publishers := map[string]kafka.Producer{}
 	for _, market := range cfg.Markets {
 		publishers[market.ID] = kafka.NewKafkaProducer(cfg.Kafka.Brokers, cfg.Kafka.UseTLS, "engine.orders."+market.ID)
 	}

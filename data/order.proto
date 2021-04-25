@@ -1,6 +1,8 @@
 syntax = "proto3";
 package data;
 
+option go_package = "around25.com/exchange/demo_api/data";
+
 /**
 Order
 =====
@@ -123,6 +125,12 @@ message Order {
 
 	// The unique identifier the account that added the order
 	uint64 OwnerID = 12;
+
+	// The amount filled in the order
+	uint64 FilledAmount = 13;
+
+	// The amount of used funds from the funds
+	uint64 UsedFunds = 14;
 
   // User Order ID: An id defined by the user to identity the order
   // UserOrderId string

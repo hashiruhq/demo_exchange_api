@@ -1,0 +1,9 @@
+version: '3.2'
+services:
+  engine_api:
+    build:
+      context: ./
+      dockerfile: Dockerfile.dev
+    image: engine_api:local
+    ports:
+      - 80:80

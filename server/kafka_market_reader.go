@@ -62,45 +62,139 @@ func (srv *server) loopReadMarketEvents(ctx context.Context, market *model.Marke
 	for {
 		select {
 		case <-ctx.Done():
+			log.Info().Str("market", id).Int64("last_offset", lastOffset).Msg("Stopping market processor")
 			log.Warn().Str("market", id).Str("termination", "shutdown").Msg("Exit market processor")
 			return
 		case msg, more := <-msgChan:
 			if !more {
+				log.Info().Str("market", id).Int64("last_offset", lastOffset).Msg("Stopping market processor")
 				log.Warn().Str("market", id).Str("termination", "chan_close").Msg("Exit market processor")
 				return
 			}
 
 			event := data.Event{}
 			event.FromBinary(msg.Value)
+			lastOffset = msg.Offset
 
-			// output trade info
-			trade := event.GetTrade()
-			if trade != nil {
-				mta.price.SetUint64(trade.Price).SetScale(market.QuotePrecision)
-				mta.volume.SetUint64(trade.Amount).SetScale(market.MarketPrecision)
-				mta.quoteVolume.Mul(mta.price, mta.volume).Quantize(market.QuotePrecision)
+			switch event.Type {
+			case data.EventType_NewTrade:
+				{
+					// output trade info
+					trade := event.GetTrade()
+					mta.price.SetUint64(trade.Price).SetScale(market.QuotePrecision)
+					mta.volume.SetUint64(trade.Amount).SetScale(market.MarketPrecision)
+					mta.quoteVolume.Mul(mta.price, mta.volume).Quantize(market.QuotePrecision)
 
-				price, _ := mta.price.Float64()
-				volume, _ := mta.volume.Float64()
-				quoteVolume, _ := mta.quoteVolume.Float64()
+					price, _ := mta.price.Float64()
+					volume, _ := mta.volume.Float64()
+					quoteVolume, _ := mta.quoteVolume.Float64()
 
-				log.Info().
-					Str("market", market.ID).
-					Int64("seq_id", int64(trade.GetSeqID())).
-					Float64("price_float", price).
-					Float64("volume_float", volume).
-					Float64("quoteVolume_float", quoteVolume).
-					Str("side", trade.TakerSide.String()).
-					Uint64("ask_id", trade.AskID).
-					Uint64("ask_owner", trade.AskOwnerID).
-					Uint64("bid_id", trade.BidID).
-					Uint64("bid_owner", trade.BidOwnerID).
-					Msg("New trade")
-				lastOffset = msg.Offset
-				continue
+					log.Info().
+						Str("market", market.ID).
+						Uint64("seq_id", event.SeqID).
+						Float64("price_float", price).
+						Float64("volume_float", volume).
+						Float64("quoteVolume_float", quoteVolume).
+						Str("side", trade.TakerSide.String()).
+						Uint64("ask_id", trade.AskID).
+						Uint64("ask_owner", trade.AskOwnerID).
+						Uint64("bid_id", trade.BidID).
+						Uint64("bid_owner", trade.BidOwnerID).
+						Msg("New trade")
+				}
+			case data.EventType_OrderStatusChange:
+				{
+					order := event.GetOrderStatus()
+					mta.price.SetUint64(order.Price).SetScale(market.QuotePrecision)
+					price, _ := mta.price.Float64()
+					mta.volume.SetUint64(order.Amount).SetScale(market.MarketPrecision)
+					amount, _ := mta.volume.Float64()
+
+					fundsPrec := market.MarketPrecision
+					if order.Side == data.MarketSide_Sell {
+						fundsPrec = market.QuotePrecision
+					}
+					mta.quoteVolume.SetUint64(order.Funds).SetScale(fundsPrec)
+					funds, _ := mta.quoteVolume.Float64()
+
+					mta.volume.SetUint64(order.FilledAmount).SetScale(market.MarketPrecision)
+					filledAmount, _ := mta.volume.Float64()
+
+					usedPrec := market.MarketPrecision
+					if order.Side == data.MarketSide_Sell {
+						usedPrec = market.QuotePrecision
+					}
+					mta.quoteVolume.SetUint64(order.UsedFunds).SetScale(usedPrec)
+					used, _ := mta.quoteVolume.Float64()
+
+					log.Info().
+						Str("market", event.Market).
+						Str("order_type", order.Type.String()).
+						Uint64("order_id", order.ID).
+						Uint64("owner_id", order.OwnerID).
+						Str("side", order.Side.String()).
+						Str("status", order.Status.String()).
+						Float64("amount", amount).
+						Float64("price", price).
+						Float64("funds", funds).
+						Float64("filled_amount", filledAmount).
+						Float64("used_funds", used).
+						Uint64("seq_id", event.SeqID).
+						Msg("New order status")
+				}
+			case data.EventType_OrderActivated:
+				{
+					order := event.GetOrderActivation()
+					mta.price.SetUint64(order.Price).SetScale(market.QuotePrecision)
+					price, _ := mta.price.Float64()
+					mta.volume.SetUint64(order.Amount).SetScale(market.MarketPrecision)
+					amount, _ := mta.volume.Float64()
+
+					fundsPrec := market.MarketPrecision
+					if order.Side == data.MarketSide_Sell {
+						fundsPrec = market.QuotePrecision
+					}
+					mta.quoteVolume.SetUint64(order.Funds).SetScale(fundsPrec)
+					funds, _ := mta.quoteVolume.Float64()
+
+					mta.volume.SetUint64(order.FilledAmount).SetScale(market.MarketPrecision)
+					filledAmount, _ := mta.volume.Float64()
+
+					usedPrec := market.MarketPrecision
+					if order.Side == data.MarketSide_Sell {
+						usedPrec = market.QuotePrecision
+					}
+					mta.quoteVolume.SetUint64(order.UsedFunds).SetScale(usedPrec)
+					used, _ := mta.quoteVolume.Float64()
+
+					log.Info().
+						Str("market", event.Market).
+						Str("order_type", order.Type.String()).
+						Uint64("order_id", order.ID).
+						Uint64("owner_id", order.OwnerID).
+						Str("side", order.Side.String()).
+						Str("status", order.Status.String()).
+						Float64("amount", amount).
+						Float64("price", price).
+						Float64("funds", funds).
+						Float64("filled_amount", filledAmount).
+						Float64("used_funds", used).
+						Uint64("seq_id", event.SeqID).
+						Msg("Stop order activated")
+				}
+			case data.EventType_Error:
+				{
+					orderError := event.GetError()
+					log.Error().
+						Str("market", event.Market).
+						Str("error_code", orderError.Code.String()).
+						Uint64("order_id", orderError.OrderID).
+						Uint64("seq_id", event.SeqID).
+						Msg("Stop order activated")
+				}
 			}
+
 			// @todo output a message for the rest of the data types.
 		}
 	}
-	log.Info().Str("market", id).Int64("last_offset", lastOffset).Msg("Stopping market processor")
 }

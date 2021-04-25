@@ -40,6 +40,8 @@ func (srv *server) SetupHTTPServer() {
 	// add health routes if enabled
 	srv.AddHealthRoutes(r)
 
+	srv.AddOrderRoutes(r)
+
 	// configure http server
 	srv.HTTP = &http.Server{
 		Addr:    ":80",

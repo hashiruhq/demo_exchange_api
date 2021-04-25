@@ -2,11 +2,13 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 
 	"around25.com/exchange/demo_api/conv"
 	"around25.com/exchange/demo_api/data"
+	"around25.com/exchange/demo_api/model"
 	"github.com/ericlagergren/decimal"
 	"github.com/gin-gonic/gin"
 	kafkaGo "github.com/segmentio/kafka-go"
@@ -16,8 +18,8 @@ import (
 func (srv *server) AddOrderRoutes(r *gin.Engine) {
 	group := r.Group("/order")
 	{
-		group.POST("/", srv.GetActiveMarket("market_id"), srv.OrderCreate)
-		group.DELETE("/", srv.GetActiveMarket("market_id"), srv.OrderCancel)
+		group.POST("/:market_id", srv.GetActiveMarket("market_id"), srv.OrderCreate)
+		group.DELETE("/:market_id", srv.GetActiveMarket("market_id"), srv.OrderCancel)
 	}
 }
 
@@ -33,12 +35,12 @@ func (srv *server) GetActiveMarket(param string) gin.HandlerFunc {
 		for _, market := range srv.Config.Markets {
 			marketMap[market.ID] = market
 		}
-		if err != nil {
+		if market, ok := marketMap[symbol]; ok {
+			c.Set("data_market", &market)
+			c.Next()
+		} else {
 			c.AbortWithStatusJSON(404, map[string]string{"error": "Invalid or inactive market"})
-			return
 		}
-		c.Set("data_market", &market)
-		c.Next()
 	}
 }
 
@@ -77,6 +79,7 @@ func (srv *server) OrderCreate(c *gin.Context) {
 	market := iMarket.(*model.Market)
 	orderType := getPostAsInt(c, "type", 0)
 	side := getPostAsInt(c, "side", 0)
+	id := getPostAsInt(c, "id", 0)
 	amount := c.PostForm("amount")
 	price := c.PostForm("price")
 	stop := getPostAsInt(c, "stop", 0)
@@ -85,7 +88,19 @@ func (srv *server) OrderCreate(c *gin.Context) {
 	userID := getPostAsInt(c, "user_id", 0)
 
 	// create order in database and then publish it on apache kafka
-	order, err := srv.publishOrder(ctx, uint64(userID), market, side, orderType, amount, price, stop, stopPrice, balance)
+	order, err := srv.publishOrder(
+		context.TODO(),
+		uint64(userID),
+		market,
+		uint64(id),
+		data.MarketSide(side),
+		data.OrderType(orderType),
+		amount,
+		price,
+		data.StopLoss(stop),
+		stopPrice,
+		balance,
+	)
 	if err != nil {
 		_ = c.Error(err)
 		abortWithError(c, 400, err.Error())
@@ -95,11 +110,17 @@ func (srv *server) OrderCreate(c *gin.Context) {
 }
 
 func (srv *server) OrderCancel(c *gin.Context) {
-	iOrder, _ := c.Get("data_order")
-	order := iOrder.(*model.Order)
 	iMarket, _ := c.Get("data_market")
 	market := iMarket.(*model.Market)
-	err := srv.publishCancelOrder(market, order)
+	id := getPostAsInt(c, "id", 0)
+	orderType := getPostAsInt(c, "type", 0)
+	price := c.PostForm("price")
+	side := getPostAsInt(c, "side", 0)
+	stop := getPostAsInt(c, "stop", 0)
+	stopPrice := c.PostForm("stop_price")
+	userID := getPostAsInt(c, "user_id", 0)
+
+	err := srv.publishCancelOrder(market, uint64(id), data.OrderType(orderType), data.MarketSide(side), price, data.StopLoss(stop), stopPrice, uint64(userID))
 	if err != nil {
 		_ = c.Error(err)
 		abortWithError(c, 500, "Unable to cancel order")
@@ -112,29 +133,44 @@ func (srv *server) OrderCancel(c *gin.Context) {
 }
 
 // publishOrder and send it to the matching engine based on the given fields
-func (srv *server) publishOrder(ctx context.Context, userID uint64, market *model.Market, side int, orderType int, amount, price string, stop int, stopPrice, balance string) (*data.Order, error) {
+func (srv *server) publishOrder(
+	ctx context.Context,
+	userID uint64,
+	market *model.Market,
+	id uint64,
+	side data.MarketSide,
+	orderType data.OrderType,
+	amount,
+	price string,
+	stop data.StopLoss,
+	stopPrice,
+	balance string,
+) (*data.Order, error) {
 	amountInUnits := conv.ToUnits(amount, uint8(market.MarketPrecision))
 	priceInUnits := conv.ToUnits(price, uint8(market.QuotePrecision))
 	stopPriceInUnits := conv.ToUnits(stopPrice, uint8(market.QuotePrecision))
-	amountAsDecimal := new(decimal.Big)
-	amountAsDecimal.SetString(conv.FromUnits(amountInUnits, uint8(market.MarketPrecision)))
-	priceAsDecimal := new(decimal.Big)
-	priceAsDecimal.SetString(conv.FromUnits(priceInUnits, uint8(market.QuotePrecision)))
-	stopPriceAsDecimal := new(decimal.Big)
-	stopPriceAsDecimal.SetString(conv.FromUnits(stopPriceInUnits, uint8(market.QuotePrecision)))
 
-	lockedFunds := new(decimal.Big)
-	usedFunds := new(decimal.Big)
-	filledAmount := new(decimal.Big)
-	feeAmount := new(decimal.Big)
-
-	funds = new(decimal.Big).Copy(balance)
-	if order.Side == data.MarketSide_Sell {
-		lockedFunds = new(decimal.Big).Copy(amountAsDecimal)
-		return
+	amountAsDecimal, ok := new(decimal.Big).SetString(amount)
+	if !ok {
+		return nil, errors.New("Invalid amount provided")
+	}
+	priceAsDecimal, ok := new(decimal.Big).SetString(price)
+	if !ok {
+		return nil, errors.New("Invalid price provided")
 	}
 
-	switch order.Type {
+	lockedFunds := new(decimal.Big)
+
+	dBalance, ok := new(decimal.Big).SetString(balance)
+	if !ok {
+		return nil, errors.New("Invalid balance provided")
+	}
+	funds := new(decimal.Big).Copy(dBalance)
+	if side == data.MarketSide_Sell {
+		lockedFunds = new(decimal.Big).Copy(amountAsDecimal)
+	}
+
+	switch orderType {
 	case data.OrderType_Limit:
 		lockedFunds = new(decimal.Big).Mul(priceAsDecimal, amountAsDecimal)
 	case data.OrderType_Market:
@@ -142,7 +178,7 @@ func (srv *server) publishOrder(ctx context.Context, userID uint64, market *mode
 	}
 
 	fundsInUnits := uint64(0)
-	if order.Side == data.MarketSide_Buy {
+	if side == data.MarketSide_Buy {
 		fundsInUnits = conv.ToUnits(fmt.Sprintf("%f", lockedFunds), uint8(market.QuotePrecision))
 	} else {
 		fundsInUnits = conv.ToUnits(fmt.Sprintf("%f", lockedFunds), uint8(market.MarketPrecision))
@@ -150,13 +186,13 @@ func (srv *server) publishOrder(ctx context.Context, userID uint64, market *mode
 
 	// publish order on the registry
 	orderEvent := data.Order{
-		ID:        order.ID,
+		ID:        id,
 		EventType: data.CommandType_NewOrder,
-		Side:      order.Side,
-		Type:      order.Type,
-		Stop:      order.Stop,
-		Market:    order.MarketID,
-		OwnerID:   order.OwnerID,
+		Side:      side,
+		Type:      orderType,
+		Stop:      stop,
+		Market:    market.ID,
+		OwnerID:   userID,
 		Amount:    amountInUnits,
 		Price:     priceInUnits,
 		StopPrice: stopPriceInUnits,
@@ -166,25 +202,32 @@ func (srv *server) publishOrder(ctx context.Context, userID uint64, market *mode
 	if err != nil {
 		return nil, err
 	}
-	err = server.publishers[market.ID].WriteMessages(ctx, kafkaGo.Message{Value: bytes})
-	return order, err
+	err = srv.publishers[market.ID].WriteMessages(context.TODO(), kafkaGo.Message{Value: bytes})
+	return &orderEvent, err
 }
 
 // Cancel an existing order
-func (srv *server) publishCancelOrder(market *model.Market, order *data.Order) error {
-	price := fmt.Sprintf("%f", order.Price.V)
+func (srv *server) publishCancelOrder(
+	market *model.Market,
+	id uint64,
+	orderType data.OrderType,
+	side data.MarketSide,
+	price string,
+	stop data.StopLoss,
+	stopPrice string,
+	userID uint64,
+) error {
 	priceInUnits := conv.ToUnits(price, uint8(market.QuotePrecision))
-	stopPrice := fmt.Sprintf("%f", order.StopPrice.V)
 	stopPriceInUnits := conv.ToUnits(stopPrice, uint8(market.QuotePrecision))
 	// publish order on the registry
 	orderEvent := data.Order{
-		ID:        order.ID,
+		ID:        id,
 		EventType: data.CommandType_CancelOrder,
-		Side:      order.Side,
-		Type:      order.Type,
-		Stop:      order.Stop,
-		Market:    order.MarketID,
-		OwnerID:   order.OwnerID,
+		Side:      side,
+		Type:      orderType,
+		Stop:      stop,
+		Market:    market.ID,
+		OwnerID:   userID,
 		Price:     priceInUnits,
 		StopPrice: stopPriceInUnits,
 	}
@@ -192,5 +235,5 @@ func (srv *server) publishCancelOrder(market *model.Market, order *data.Order) e
 	if err != nil {
 		return err
 	}
-	return server.publishers[market.ID].WriteMessages(ctx, kafkaGo.Message{Value: bytes})
+	return srv.publishers[market.ID].WriteMessages(context.TODO(), kafkaGo.Message{Value: bytes})
 }

@@ -11,7 +11,7 @@ server:
 
 kafka:
   brokers: 
-    - 161.35.212.60:9092
+    - kafka:9092
 
 markets:
   - id: btcusdt
@@ -19,13 +19,3 @@ markets:
     quote_precision: 5
     market_coin_symbol: btc
     quote_coin_symbol: usdt
-  - id: ethusdt
-    market_precision: 6
-    quote_precision: 5
-    market_coin_symbol: eth
-    quote_coin_symbol: usdt
-  - id: ethbtc
-    market_precision: 6
-    quote_precision: 8
-    market_coin_symbol: eth
-    quote_coin_symbol: btc
