@@ -110,9 +110,9 @@ func (srv *server) loopReadMarketEvents(ctx context.Context, market *model.Marke
 					mta.volume.SetUint64(order.Amount).SetScale(market.MarketPrecision)
 					amount, _ := mta.volume.Float64()
 
-					fundsPrec := market.MarketPrecision
+					fundsPrec := market.QuotePrecision
 					if order.Side == data.MarketSide_Sell {
-						fundsPrec = market.QuotePrecision
+						fundsPrec = market.MarketPrecision
 					}
 					mta.quoteVolume.SetUint64(order.Funds).SetScale(fundsPrec)
 					funds, _ := mta.quoteVolume.Float64()
@@ -120,11 +120,7 @@ func (srv *server) loopReadMarketEvents(ctx context.Context, market *model.Marke
 					mta.volume.SetUint64(order.FilledAmount).SetScale(market.MarketPrecision)
 					filledAmount, _ := mta.volume.Float64()
 
-					usedPrec := market.MarketPrecision
-					if order.Side == data.MarketSide_Sell {
-						usedPrec = market.QuotePrecision
-					}
-					mta.quoteVolume.SetUint64(order.UsedFunds).SetScale(usedPrec)
+					mta.quoteVolume.SetUint64(order.UsedFunds).SetScale(market.QuotePrecision)
 					used, _ := mta.quoteVolume.Float64()
 
 					log.Info().
@@ -150,9 +146,9 @@ func (srv *server) loopReadMarketEvents(ctx context.Context, market *model.Marke
 					mta.volume.SetUint64(order.Amount).SetScale(market.MarketPrecision)
 					amount, _ := mta.volume.Float64()
 
-					fundsPrec := market.MarketPrecision
+					fundsPrec := market.QuotePrecision
 					if order.Side == data.MarketSide_Sell {
-						fundsPrec = market.QuotePrecision
+						fundsPrec = market.MarketPrecision
 					}
 					mta.quoteVolume.SetUint64(order.Funds).SetScale(fundsPrec)
 					funds, _ := mta.quoteVolume.Float64()
@@ -160,11 +156,7 @@ func (srv *server) loopReadMarketEvents(ctx context.Context, market *model.Marke
 					mta.volume.SetUint64(order.FilledAmount).SetScale(market.MarketPrecision)
 					filledAmount, _ := mta.volume.Float64()
 
-					usedPrec := market.MarketPrecision
-					if order.Side == data.MarketSide_Sell {
-						usedPrec = market.QuotePrecision
-					}
-					mta.quoteVolume.SetUint64(order.UsedFunds).SetScale(usedPrec)
+					mta.quoteVolume.SetUint64(order.UsedFunds).SetScale(market.QuotePrecision)
 					used, _ := mta.quoteVolume.Float64()
 
 					log.Info().

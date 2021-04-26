@@ -77,12 +77,12 @@ func abortWithError(c *gin.Context, code int, message string) {
 func (srv *server) OrderCreate(c *gin.Context) {
 	iMarket, _ := c.Get("data_market")
 	market := iMarket.(*model.Market)
-	orderType := getPostAsInt(c, "type", 0)
-	side := getPostAsInt(c, "side", 0)
+	orderType := data.OrderType(data.OrderType_value[c.PostForm("type")])
+	side := data.MarketSide(data.MarketSide_value[c.PostForm("side")])
+	stop := data.StopLoss(data.StopLoss_value[c.PostForm("stop")])
 	id := getPostAsInt(c, "id", 0)
 	amount := c.PostForm("amount")
 	price := c.PostForm("price")
-	stop := getPostAsInt(c, "stop", 0)
 	stopPrice := c.PostForm("stop_price")
 	balance := c.PostForm("balance")
 	userID := getPostAsInt(c, "user_id", 0)
@@ -93,11 +93,11 @@ func (srv *server) OrderCreate(c *gin.Context) {
 		uint64(userID),
 		market,
 		uint64(id),
-		data.MarketSide(side),
-		data.OrderType(orderType),
+		side,
+		orderType,
 		amount,
 		price,
-		data.StopLoss(stop),
+		stop,
 		stopPrice,
 		balance,
 	)
@@ -113,10 +113,10 @@ func (srv *server) OrderCancel(c *gin.Context) {
 	iMarket, _ := c.Get("data_market")
 	market := iMarket.(*model.Market)
 	id := getPostAsInt(c, "id", 0)
-	orderType := getPostAsInt(c, "type", 0)
+	orderType := data.OrderType(data.OrderType_value[c.PostForm("type")])
+	side := data.MarketSide(data.MarketSide_value[c.PostForm("side")])
+	stop := data.StopLoss(data.StopLoss_value[c.PostForm("stop")])
 	price := c.PostForm("price")
-	side := getPostAsInt(c, "side", 0)
-	stop := getPostAsInt(c, "stop", 0)
 	stopPrice := c.PostForm("stop_price")
 	userID := getPostAsInt(c, "user_id", 0)
 
@@ -168,13 +168,13 @@ func (srv *server) publishOrder(
 	funds := new(decimal.Big).Copy(dBalance)
 	if side == data.MarketSide_Sell {
 		lockedFunds = new(decimal.Big).Copy(amountAsDecimal)
-	}
-
-	switch orderType {
-	case data.OrderType_Limit:
-		lockedFunds = new(decimal.Big).Mul(priceAsDecimal, amountAsDecimal)
-	case data.OrderType_Market:
-		lockedFunds = new(decimal.Big).Copy(funds)
+	} else {
+		switch orderType {
+		case data.OrderType_Limit:
+			lockedFunds = new(decimal.Big).Mul(priceAsDecimal, amountAsDecimal)
+		case data.OrderType_Market:
+			lockedFunds = new(decimal.Big).Copy(funds)
+		}
 	}
 
 	fundsInUnits := uint64(0)
