@@ -185,8 +185,6 @@ func (srv *server) loopReadMarketEvents(ctx context.Context, market *model.Marke
 						Msg("Stop order activated")
 				}
 			}
-
-			// @todo output a message for the rest of the data types.
 		}
 	}
 }
